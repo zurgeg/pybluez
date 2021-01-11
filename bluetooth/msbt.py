@@ -12,7 +12,10 @@ def discover_devices (duration=8, flush_cache=True, lookup_names=False,
     namesIndex = 1
     classIndex = 2
 
-    devices = bt.discover_devices(duration=duration, flush_cache=flush_cache)
+    try:
+        devices = bt.discover_devices(duration=duration, flush_cache=flush_cache)
+    except OSError:
+        return []
     ret = list()
     for device in devices:
         item = [device[btAddresIndex],]
@@ -35,7 +38,10 @@ def read_local_bdaddr():
 def lookup_name (address, timeout=10):
     if not is_valid_address (address): 
         raise ValueError ("Invalid Bluetooth address")
-    return bt.lookup_name (address)
+    try:
+        return bt.lookup_name(address)
+    except OSError:
+        return None
 
 
 class BluetoothSocket:
@@ -57,6 +63,18 @@ class BluetoothSocket:
         # write only)
         self._blocking = True
         self._timeout = False
+
+    @property
+    def family (self):
+        return bt.AF_BTH
+
+    @property
+    def type (self):
+        return bt.SOCK_STREAM
+
+    @property
+    def proto (self):
+        return bt.BTHPROTO_RFCOMM
 
     def bind (self, addrport):
         if self._proto == RFCOMM:
@@ -88,6 +106,11 @@ class BluetoothSocket:
 
     def getsockname (self):
         return bt.getsockname (self._sockfd)
+
+    def getpeername (self):
+        return bt.getpeername (self._sockfd)
+
+    getpeername.__doc__ = bt.getpeername.__doc__
 
     def setblocking (self, blocking):
         bt.setblocking (self._sockfd, blocking)
@@ -134,7 +157,7 @@ def advertise_service (sock, name, service_id = "", service_classes = [], \
             raise ValueError ("invalid UUID specified in protocols")        
 
     if sock._raw_sdp_record is not None:
-        raise IOError ("service already advertised")
+        raise OSError("service already advertised")
 
     avpairs = []
 
@@ -197,7 +220,7 @@ def advertise_service (sock, name, service_id = "", service_classes = [], \
 
 def stop_advertising (sock):
     if sock._raw_sdp_record is None:
-        raise IOError ("service isn't advertised, " \
+        raise OSError("service isn't advertised, " \
                         "but trying to un-advertise")
     bt.set_service_raw (sock._raw_sdp_record, False, sock._sdp_handle)
     sock._raw_sdp_record = None
